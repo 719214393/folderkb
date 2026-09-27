@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- RAG 后端 macOS 看门狗配置（launchd——系统原生零下载，对应 Windows 侧 NSSM/任务计划程序）
+     放置路径：~/Library/LaunchAgents/com.rag.backend.plist（当前用户）或
+              /Library/LaunchDaemons/com.rag.backend.plist（无人值守，需 root）
+     注册：launchctl load ~/Library/LaunchAgents/com.rag.backend.plist
+     卸载：launchctl unload ~/Library/LaunchAgents/com.rag.backend.plist
+     崩溃自动重启：KeepAlive=true；开机自启：RunAtLoad=true；连崩退避：ThrottleInterval=10（秒）-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.rag.backend</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/path/to/server.py</string>
+    </array>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/rag_backend.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/rag_backend.err</string>
+</dict>
+</plist>

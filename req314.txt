@@ -1,0 +1,44 @@
+# req314.txt —— 降级方案 B：macOS 老系统（Intel Mac / M 系列 + macOS 12/13）精简依赖清单
+# 生成方式：requirements.txt 剔除 OCR 链 4 个包（onnxruntime / rapidocr /
+#   rapid-table / opencv_python）后另存的副本；pypdfium2 保留——它是
+#   pdfplumber 的硬依赖剔不得，且 5.11.0 的 arm 轮子是 macosx_12_0，
+#   M1 + macOS 12/13 也能装（5.13.0 要 macOS 13，故 darwin 全系钉 5.11.0）
+# 代价：本地 OCR / 表格识别全部不可用——扫描 PDF 走云端视觉 API 兜底
+#   （前端需配置 X-Chat-Key / X-Chat-Url），纯文本文档解析完全正常
+# 代码零改动：server.py 不 import cv2；OCR 链懒加载 + try/except 兜底
+fastapi==0.141.1
+
+httpx==0.28.1
+
+jieba==0.42.1
+
+lxml==6.1.1
+
+lxml_html_clean==0.4.5
+
+markdown-it-py==4.2.0
+
+numpy==2.5.3
+
+openpyxl==3.1.5
+
+pdfplumber==0.11.10
+
+cryptography==48.0.1    # 新增钉版：49+ 只发 arm64 轮子（universal2 最后版）
+
+pydantic==2.13.5
+
+pydantic_core==2.46.5
+
+pypdf==6.18.1
+
+pypdfium2==5.11.0; sys_platform == "darwin"
+pypdfium2==5.13.0; sys_platform != "darwin"
+
+python-docx==1.2.0
+
+pywebview==6.2.1
+
+uvicorn==0.52.4
+
+Pillow==12.3.0

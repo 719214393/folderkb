@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 对话助手</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: #f7f7f8;
+      overflow: hidden; /* 整页不滚，滚动交给对话流 */
+    }
+
+    /* ============ 整体三栏骨架 ============ */
+    .app {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* ============ 左侧栏 ============ */
+    .sidebar {
+      width: 240px;
+      background: #fff;
+      border-right: 1px solid #ececf1;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .new-chat-btn {
+      margin: 12px;
+      padding: 10px 16px;
+      background: #4d6bfe;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .new-chat-btn:hover { background: #3a56e0; }
+    .sidebar-label {
+      padding: 8px 16px 4px;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    /* 会话列表 */
+    .conv-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 8px;
+    }
+    .conv-item {
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #374151;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 2px;
+    }
+    .conv-item:hover { background: #f3f4f6; }
+    .conv-item.active { background: #eef2ff; color: #4d6bfe; font-weight: 600; }
+    /* 底部模型选择 */
+    .sidebar-footer {
+      border-top: 1px solid #ececf1;
+      padding: 10px 12px;
+    }
+    .model-label { font-size: 11px; color: #9ca3af; margin-bottom: 4px; }
+    .combobox { position: relative; }
+    .combobox input {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 12px;
+      outline: none;
+    }
+    .combobox input:focus { border-color: #4d6bfe; }
+    .model-list {
+      position: absolute;
+      bottom: calc(100% + 4px); /* 向上弹出（输入框在底部） */
+      left: 0; right: 0;
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      max-height: 240px;
+      overflow-y: auto;
+      list-style: none;
+      z-index: 50;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      display: none;
+    }
+    .model-list.open { display: block; }
+    .model-list li {
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      word-break: break-all;
+    }
+    .model-list li:hover, .model-list li.active { background: #eef2ff; }
+    .model-list li.empty { color: #9ca3af; cursor: default; }
+
+    /* ============ 右侧主区 ============ */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0; /* 防止内容撑破 */
+    }
+
+    /* 顶部标题条 */
+    .topbar {
+      position: relative;  /* 设置按钮 absolute 定位的参照物（按钮吸在右上角） */
+      padding: 14px 24px;
+      background: #fff;
+      border-bottom: 1px solid #ececf1;
+      font-size: 15px;
+      font-weight: 600;
+      color: #1f2937;
+      flex-shrink: 0;
+    }
+
+    /* 对话流 */
+    .chat-flow {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 0;
+    }
+    .chat-inner {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+    /* 空状态提示 */
+    .empty-hint {
+      text-align: center;
+      color: #9ca3af;
+      font-size: 14px;
+      padding: 80px 0;
+    }
+    .empty-hint h2 { font-size: 20px; color: #6b7280; margin-bottom: 12px; font-weight: 600; }
+
+    /* 用户消息气泡：右对齐 */
+    .msg-user {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 14px;
+    }
+    .msg-user .bubble {
+      background: #4d6bfe;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 14px 14px 3px 14px;
+      max-width: 75%;
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .msg-user .bubble .attach-tag {
+      display: block;
+      font-size: 12px;
+      opacity: 0.85;
+      margin-top: 4px;
+    }
+
+    /* AI 消息：左对齐 */
+    .msg-ai {
+      margin-bottom: 16px;
+    }
+    .msg-ai .ai-head {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .msg-ai .ai-body {
+      font-size: 14px;
+      line-height: 1.55;
+      color: #1f2937;
+      word-break: break-word;
+    }
+    .msg-ai .ai-body.error { color: #dc2626; }
+    .cursor-blink { color: #4d6bfe; animation: blink 0.8s infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* 思考过程 / 调用过程：可折叠块（豆包风格） */
+    .fold-block {
+      margin-top: 10px;
+      border: 1px solid #ececf1;
+      border-radius: 8px;
+      background: #fafafa;
+      overflow: hidden;
+    }
+    .fold-header {
+      padding: 7px 12px;
+      font-size: 12px;
+      color: #6b7280;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .fold-header:hover { background: #f3f4f6; }
+    .fold-header .arrow { transition: transform 0.2s; font-size: 10px; }
+    .fold-block.open .arrow { transform: rotate(90deg); }
+    .fold-body {
+      display: none;
+      padding: 8px 12px;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #6b7280;
+      max-height: 220px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border-top: 1px dashed #e5e7eb;
+    }
+    .fold-block.open .fold-body { display: block; }
+    .fold-body .step { padding: 3px 0; white-space: pre-wrap; word-break: break-word; } /* 2026-09-23 修：工具返回的真换行折行显示 */
+    .fold-body .step.user { color: #4d6bfe; }
+    .fold-body .step.tool { color: #b45309; font-family: Consolas, monospace; }
+    .fold-body .step.tool-result { color: #059669; font-family: Consolas, monospace; }
+
+    /* ============ 底部输入区 ============ */
+    .input-area {
+      flex-shrink: 0;
+      background: #fff;
+      border-top: 1px solid #ececf1;
+      padding: 14px 20px 18px;
+    }
+    .input-box {
+      max-width: 780px;
+      margin: 0 auto;
+    }
+    /* 输入框容器：textarea + 底部工具行 */
+    .input-shell {
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fff;
+    }
+    .input-shell:focus-within { border-color: #4d6bfe; }
+    .input-shell textarea {
+      width: 100%;
+      height: 72px;
+      border: none;
+      outline: none;
+      resize: none;
+      font-size: 14px;
+      font-family: inherit;
+      background: transparent;
+    }
+    .input-tools {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .tool-btn {
+      padding: 5px 12px;
+      font-size: 12px;
+      background: #f3f4f6;
+      color: #374151;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .tool-btn:hover { background: #e5e7eb; }
+    .tool-btn.send {
+      margin-left: auto;
+      background: #4d6bfe;
+      color: #fff;
+      border: none;
+      padding: 7px 24px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .tool-btn.send:disabled { background: #9db0ff; cursor: not-allowed; }
+    /* 生成中按钮变形为红色"停止"（可点，不置灰） */
+    .tool-btn.send.stop {
+      background: #dc2626;
+      color: #fff;
+      cursor: pointer;
+    }
+    .tool-btn.send.stop:hover { background: #b91c1c; }
+    /* 知识库状态行 */
+    .kb-bar {
+      max-width: 780px;
+      margin: 0 auto 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .kb-bar input {
+      flex: 1;
+      min-width: 0;
+      padding: 6px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: Consolas, monospace;
+      outline: none;
+    }
+    .kb-bar input:focus { border-color: #4d6bfe; }
+    .kb-bar button {
+      padding: 6px 12px;
+      font-size: 12px;
+      margin-top: 0;
+      flex-shrink: 0;
+    }
+    #kbStatus { color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #kbStatus.ready { color: #059669; font-weight: 600; }
+    /* 附件预览（图片/文档）行 */
+    .attach-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .img-box { position: relative; }
+    .img-box img { height: 60px; border-radius: 6px; border: 1px solid #e5e7eb; display: block; }
+    .doc-box {
+      position: relative;
+      display: flex;
+      align-items: center;
+      padding: 6px 28px 6px 10px;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #166534;
+    }
+    .doc-box span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+    .img-del {
+      position: absolute;
+      top: -6px; right: -6px;
+      width: 18px; height: 18px;
+      background: #dc2626;
+      color: #fff;
+      border-radius: 50%;
+      font-size: 12px;
+      line-height: 18px;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    /* ============ 目录浏览器模态框（保留） ============ */
+    .folder-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 100;
+    }
+    .folder-modal.open { display: flex; justify-content: center; align-items: center; }
+    .folder-modal-box {
+      width: 560px;
+      max-width: 92vw;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .folder-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: #4d6bfe;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .folder-modal-x { padding: 2px 10px; font-size: 18px; background: transparent; color: #fff; }
+    .folder-modal-crumbs {
+      padding: 8px 16px;
+      font-size: 12px;
+      color: #4d6bfe;
+      border-bottom: 1px solid #e5e7eb;
+      min-height: 34px;
+    }
+    .folder-modal-crumbs span { cursor: pointer; }
+    .folder-modal-crumbs span:hover { text-decoration: underline; }
+    .folder-modal-list { max-height: 340px; overflow-y: auto; padding: 8px 0; }
+    .folder-modal-list .dir-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 16px; font-size: 13px; cursor: pointer;
+    }
+    .folder-modal-list .dir-item:hover { background: #eef2ff; }
+    .folder-modal-list .dir-item.hidden-dir { color: #9ca3af; }
+    .folder-modal-footer {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 16px; border-top: 1px solid #e5e7eb;
+    }
+    .folder-current {
+      font-size: 12px; color: #6b7280;
+      font-family: Consolas, monospace;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 340px;
+    }
+    /* 切块预览模态框：复用 .folder-modal 遮罩，盒子加宽显示长文本 */
+    .chunk-box { width: 720px; }
+    .chunk-list { max-height: 62vh; overflow-y: auto; padding: 12px 16px; background: #fff; }
+    .chunk-item { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+    .chunk-item:last-child { margin-bottom: 0; }
+    .chunk-item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .chunk-item-file { font-family: Consolas, monospace; font-size: 12px; color: #4d6bfe; font-weight: 600; word-break: break-all; }
+    .chunk-item-meta { font-size: 12px; color: #9ca3af; flex-shrink: 0; margin-left: 8px; }
+    .chunk-item-text { font-size: 13px; color: #374151; line-height: 1.6; white-space: pre-wrap; word-break: break-word; border-top: 1px dashed #e5e7eb; padding-top: 8px; }
+    .chunk-empty { padding: 32px; text-align: center; color: #9ca3af; font-size: 13px; }
+    /* ⑦7 格式徽章/分布条/失败明因区 */
+    .fmt-badge { display: inline-block; font-size: 10px; font-weight: 700; color: #4d6bfe; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 4px; padding: 1px 5px; margin-right: 6px; flex-shrink: 0; }
+    .fmt-bar { font-size: 12px; color: #6b7280; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; }
+    .fail-bar { font-size: 12px; color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; line-height: 1.7; word-break: break-all; }
+    .chunk-progress { color: #6b7280; font-size: 13px; margin-bottom: 16px; }
+    .chunk-start-btn {
+      padding: 8px 24px; font-size: 13px; background: #4d6bfe; color: #fff;
+      border: none; border-radius: 8px; cursor: pointer;
+    }
+    .chunk-start-btn:disabled { background: #9db0ff; cursor: not-allowed; }
+    .embed-status-bar {
+      padding: 8px 16px; font-size: 12px; color: #6b7280;
+      background: #f9fafb; border-bottom: 1px solid #e5e7eb;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    }
+    .embed-status-bar .pct { color: #4d6bfe; font-weight: 600; }
+    .rag-toggle {
+      display: flex; align-items: center; gap: 4px; font-size: 12px;
+      color: #374151; cursor: pointer; flex-shrink: 0; user-select: none;
+    }
+    .rag-toggle input { cursor: pointer; }
+    /* 检索输入框：嵌在切块弹窗里，状态条之下、块列表之上 */
+    .search-bar { padding: 10px 16px; border-bottom: 1px solid #e5e7eb; background: #fff; }
+    .search-bar input {
+      width: 100%; padding: 8px 12px; font-size: 13px;
+      border: 1px solid #d1d5db; border-radius: 8px; outline: none;
+    }
+    .search-bar input:focus { border-color: #4d6bfe; }
+    /* 检索命中卡片：比切块卡片多一个分数角标 */
+    .hit-score {
+      font-size: 12px; color: #059669; font-weight: 600;
+      flex-shrink: 0; margin-left: 8px; font-family: Consolas, monospace;
+    }
+    /* markdown 渲染样式（AI 正文里的表格/代码块/列表） */
+    .ai-body table { border-collapse: collapse; margin: 6px 0; font-size: 13px; }
+    .ai-body th, .ai-body td { border: 1px solid #e5e7eb; padding: 6px 12px; text-align: left; }
+    .ai-body th { background: #f9fafb; font-weight: 600; }
+    .ai-body code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; font-size: 13px; font-family: Consolas, monospace; }
+    .ai-body pre { background: #1f2937; color: #e5e7eb; padding: 10px; border-radius: 8px; overflow-x: auto; margin: 6px 0; }
+    .ai-body pre code { background: transparent; color: inherit; padding: 0; }
+    .ai-body h1, .ai-body h2, .ai-body h3 { margin: 8px 0 4px; }
+    .ai-body h1 { font-size: 17px; } .ai-body h2 { font-size: 16px; } .ai-body h3 { font-size: 15px; }
+    .ai-body ul, .ai-body ol { padding-left: 20px; margin: 4px 0; }
+    .ai-body p { margin: 4px 0; }
+    .ai-body blockquote { border-left: 3px solid #d1d5db; padding-left: 10px; color: #6b7280; margin: 4px 0; }
+    /* ============ 设置弹窗（BYOK） ============ */
+    .settings-box { width: 480px; }
+    .settings-body { padding: 16px 20px; max-height: 64vh; overflow-y: auto; }
+    .settings-section { margin-bottom: 18px; }
+    .settings-section-title {
+      font-size: 13px; font-weight: 600; color: #374151;
+      margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+    }
+    .settings-section-title .req { color: #dc2626; font-weight: 600; }
+    .settings-field { margin-bottom: 10px; }
+    .settings-field label { display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+    .settings-field input {
+      width: 100%; padding: 8px 12px; font-size: 13px;
+      border: 1px solid #d1d5db; border-radius: 8px; outline: none;
+      font-family: Consolas, monospace;
+    }
+    .settings-field input:focus { border-color: #4d6bfe; }
+    .settings-link {
+      font-size: 12px; color: #4d6bfe; text-decoration: none;
+    }
+    .settings-link:hover { text-decoration: underline; }
+    .settings-hint { font-size: 12px; color: #9ca3af; line-height: 1.5; margin-top: 4px; }
+    .settings-test-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+    .settings-test-btn {
+      padding: 6px 14px; font-size: 12px; background: #fff; color: #4d6bfe;
+      border: 1px solid #4d6bfe; border-radius: 8px; cursor: pointer;
+    }
+    .settings-test-btn:hover { background: #eef2ff; }
+    .settings-test-result { font-size: 12px; }
+    .settings-test-result.ok { color: #059669; }
+    .settings-test-result.err { color: #dc2626; }
+    .same-key-check {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 12px; color: #6b7280; cursor: pointer; user-select: none;
+      margin: 2px 0 8px;
+    }
+    .same-key-check input { cursor: pointer; }
+    .settings-footer {
+      display: flex; justify-content: flex-end; gap: 10px;
+      padding: 12px 16px; border-top: 1px solid #e5e7eb;
+    }
+    .settings-save-btn {
+      padding: 8px 24px; font-size: 13px; background: #4d6bfe; color: #fff;
+      border: none; border-radius: 8px; cursor: pointer;
+    }
+    .settings-save-btn:disabled { background: #9db0ff; cursor: not-allowed; }
+    .settings-cancel-btn {
+      padding: 8px 20px; font-size: 13px; background: #fff; color: #6b7280;
+      border: 1px solid #d1d5db; border-radius: 8px; cursor: pointer;
+    }
+    /* 顶栏设置按钮 */
+    .settings-btn {
+      position: static;
+      padding: 4px 12px; font-size: 12px; background: transparent; color: #6b7280;
+      border: 1px solid #d1d5db; border-radius: 8px; cursor: pointer;
+    }
+    .settings-btn:hover { border-color: #4d6bfe; color: #4d6bfe; }
+    .settings-btn.has-key { border-color: #059669; color: #059669; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <!-- ============ 左侧栏 ============ -->
+    <aside class="sidebar">
+      <button class="new-chat-btn" id="newChatBtn">＋ 新对话</button>
+      <div class="sidebar-label">历史会话</div>
+      <div class="conv-list" id="convList">
+        <div class="empty-hint" style="padding:20px 8px; font-size:12px;">暂无会话</div>
+      </div>
+      <div class="sidebar-footer">
+        <div class="model-label">模型</div>
+        <div class="combobox">
+          <input id="modelSelect" type="text" placeholder="点击选择，或输入关键字筛选" autocomplete="off">
+          <ul id="modelList" class="model-list"></ul>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ============ 右侧主区 ============ -->
+    <main class="main">
+      <div class="topbar" id="topbar" style="position:relative"><span id="topbarTitle">AI 对话助手</span><div style="position:absolute;right:16px;top:50%;transform:translateY(-50%);display:flex;gap:8px;align-items:center"><button id="exportBtn" title="导出当前会话为 Markdown（证据链：问答+引用来源）" style="padding:4px 12px;font-size:12px;background:transparent;color:#6b7280;border:1px solid #d1d5db;border-radius:8px;cursor:pointer;">📤 导出</button><button id="logsBtn" title="日志面板（全链路查询：按问题/trace_id/级别/关键词查所有调用与输出）" style="padding:4px 12px;font-size:12px;background:transparent;color:#6b7280;border:1px solid #d1d5db;border-radius:8px;cursor:pointer;">📋 日志</button><button id="healthBtn" title="服务健康监控" style="padding:4px 12px;font-size:12px;background:transparent;color:#6b7280;border:1px solid #d1d5db;border-radius:8px;cursor:pointer;">📊 健康</button><button class="settings-btn" id="settingsBtn" title="API Key 设置">⚙ 设置</button></div></div>
+
+      <div class="chat-flow" id="chatFlow">
+        <div class="chat-inner" id="chatInner">
+          <div class="empty-hint">
+            <h2>有什么可以帮你？</h2>
+            输入问题开始对话 · Ctrl+V 粘贴图片 · 上传文档总结
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部输入区 -->
+      <div class="input-area">
+        <!-- 知识库行（RAG 用，保留） -->
+        <div class="kb-bar">
+          <input id="kbPathInput" type="text" placeholder="知识库路径（RAG 检索用），或点「选择文件夹」">
+          <button id="browseFolderBtn">选择文件夹</button>
+          <button id="pickFolderBtn">扫描</button>
+          <button id="viewChunksBtn">看切块</button>
+          <button id="embedBtn">向量化</button>
+          <label class="rag-toggle" title="勾选后发送消息会先检索知识库，命中块拼进提示词"><input type="checkbox" id="ragToggle"> RAG</label>
+          <span id="kbStatus">未选择知识库</span>
+        </div>
+        <div class="input-box">
+          <!-- 附件预览（图片缩略图/文档卡片） -->
+          <div id="attachRow" class="attach-row" style="display:none"></div>
+          <div class="input-shell">
+            <textarea id="userInput" placeholder="输入你的问题…（Enter 发送，Shift+Enter 换行）"></textarea>
+            <div class="input-tools">
+              <input id="docFileInput" type="file" accept=".txt,.md" style="display:none">
+              <button class="tool-btn" id="uploadDocBtn">📄 文档</button>
+              <button class="tool-btn send" id="sendBtn">发送</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 目录浏览器模态框 -->
+  <div id="folderModal" class="folder-modal">
+    <div class="folder-modal-box">
+      <div class="folder-modal-header">
+        <span>选择文件夹</span>
+        <button id="folderModalClose" class="folder-modal-x">×</button>
+      </div>
+      <div class="folder-modal-crumbs" id="folderCrumbs"></div>
+      <div class="folder-modal-list" id="folderList"></div>
+      <div class="folder-modal-footer">
+        <span id="folderCurrentLabel" class="folder-current"></span>
+        <button id="folderConfirmBtn">选定此文件夹</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 切块预览模态框（复用目录浏览器的遮罩样式，盒子加宽） -->
+  <div id="chunkModal" class="folder-modal">
+    <div class="folder-modal-box chunk-box">
+      <div class="folder-modal-header">
+        <span id="chunkModalTitle">切块预览</span>
+        <button id="chunkModalClose" class="folder-modal-x">×</button>
+      </div>
+      <div class="embed-status-bar" id="embedStatusBar" style="display:none"></div>
+      <div class="search-bar">
+        <input id="searchInput" type="text" placeholder="问知识库一个问题，回车检索最相关的块…">
+      </div>
+      <div class="chunk-list" id="chunkList"></div>
+    </div>
+  </div>
+
+  
+<!-- ⑫8 日志面板弹窗（2026-09-21：全链路日志查询——问错了来这里看每一步） -->
+<div id="logsModal" class="folder-modal">
+  <div class="folder-modal-box settings-box" style="max-width:960px;width:92%">
+    <div class="folder-modal-header">
+      <span>📋 日志面板（全链路查询——问错了按 trace_id 查每一步调用）</span>
+      <button id="logsModalClose" class="folder-modal-x">×</button>
+    </div>
+    <div class="settings-body" style="max-height:78vh;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <select id="logFile" style="padding:6px;border:1px solid #d1d5db;border-radius:6px">
+          <option value="all">全部文件</option>
+          <option value="api">api（请求摘要）</option>
+          <option value="search">search（检索链路）</option>
+          <option value="chat">chat（生成/审计）</option>
+          <option value="sql">sql（查表路）</option>
+          <option value="parse">parse（解析明细）</option>
+          <option value="task">task（后台任务）</option>
+        </select>
+        <input id="logTrace" placeholder="trace_id（一次提问的全链路串起来）" style="flex:1;min-width:180px;padding:6px;border:1px solid #d1d5db;border-radius:6px">
+        <select id="logLevel" style="padding:6px;border:1px solid #d1d5db;border-radius:6px">
+          <option value="">全部级别</option>
+          <option value="INFO">INFO</option>
+          <option value="WARNING">WARNING</option>
+          <option value="ERROR">ERROR</option>
+        </select>
+        <input id="logQ" placeholder="关键词（如：科目1002 / rerank / 429）" style="flex:1;min-width:180px;padding:6px;border:1px solid #d1d5db;border-radius:6px">
+        <button id="logSearchBtn" style="padding:6px 14px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer">🔍 查询</button>
+        <button id="logDetailSearchBtn" style="padding:6px 14px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer">🔍 搜明细档</button><button id="logTailBtn" style="padding:6px 14px;background:#6b7280;color:#fff;border:none;border-radius:6px;cursor:pointer">最近 50 条</button>
+      </div>
+      <details style="font-size:12px;color:#6b7280"><summary>📌 六个日志文件什么意思（点开）</summary><div style="padding:6px 0;line-height:1.9">
+      <b>API</b>＝前端↔后端 HTTP 请求（每次页面调后端接口：路径/状态/耗时）<br>
+      <b>SEARCH</b>＝检索过程（语义路→关键词路→RRF融合→rerank精排，含命中文件 top5）<br>
+      <b>SQL</b>＝查表路（判成查表题后直查 Excel：命中哪个文件哪张表）<br>
+      <b>CHAT</b>＝大模型调用与审计（LLM调用：模型/耗时/字数）<br>
+      <b>TASK</b>＝后台任务（扫描/分块/向量化批次）<br>
+      <b>PARSE</b>＝文件解析（读文件转文本：耗时/产出块数）<br>
+      <span style="color:#94a3b8">用法：拿一次提问的 trace_id 搜 → 该次提问的全部步骤按时间序串出——哪步出错一眼定位。评测进程写的记录无 trace_id（显示为空）属正常。</span>
+    </div></details><div id="logStats" style="font-size:12px;color:#6b7280"></div>
+      <div id="logList" style="flex:1;overflow-y:auto;background:#0b1220;color:#c9d1d9;border-radius:8px;padding:10px;font-family:Consolas,monospace;font-size:12px;line-height:1.6"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ⑫8 明细档详情弹窗（C1：点击日志行看全量现场） -->
+<div id="detailModal" class="folder-modal">
+  <div class="folder-modal-box settings-box" style="max-width:1000px;width:94%">
+    <div class="folder-modal-header">
+      <span id="detailTitle">明细档</span>
+      <button id="detailModalClose" class="folder-modal-x">×</button>
+    </div>
+    <div class="settings-body" style="max-height:80vh;overflow-y:auto">
+      <div id="detailBody" style="background:#0b1220;border-radius:8px;padding:14px;font-family:Consolas,monospace;font-size:12px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ⑫7 服务健康弹窗（独立于设置——设置只管 key 配置） -->
+  <div id="healthModal" class="folder-modal">
+    <div class="folder-modal-box settings-box">
+      <div class="folder-modal-header">
+        <span>📊 服务健康监控（调用量/耗时/失败率/降级/断路器）</span>
+        <button id="healthModalClose" class="folder-modal-x">×</button>
+      </div>
+      <div class="settings-body">
+        <div class="settings-section">
+          <div style="margin-bottom:8px;"><button class="settings-test-btn" id="healthRefreshBtn">刷新指标</button></div>
+          <div id="healthPanel" style="font-size:12px;line-height:1.9;color:#555;">点击"刷新指标"读取服务状态</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 设置弹窗（BYOK：聊天 key 必填；嵌入 key 开 RAG 时才必填；重排可独立配置） -->
+  <div id="settingsModal" class="folder-modal">
+    <div class="folder-modal-box settings-box">
+      <div class="folder-modal-header">
+        <span>API 设置（用自己的 Key，零中间商）</span>
+        <button id="settingsModalClose" class="folder-modal-x">×</button>
+      </div>
+      <div class="settings-body">
+        <div class="settings-section">
+          <div class="settings-section-title">① 聊天模型 <span class="req">*</span>（必填）</div>
+          <div class="settings-field">
+            <label>接口地址（OpenAI 兼容格式）</label>
+            <input id="chatUrlInput" type="text" placeholder="https://api.siliconflow.cn/v1">
+          </div>
+          <div class="settings-field">
+            <label>API Key</label>
+            <input id="chatKeyInput" type="password" placeholder="sk-..." autocomplete="off">
+          </div>
+          <div class="settings-hint">没有 Key？去 <a class="settings-link" href="https://siliconflow.cn" target="_blank">硅基流动</a> 注册（免费额度够用很久）</div>
+          <div class="settings-test-row">
+            <button class="settings-test-btn" id="chatTestBtn">测试连接</button>
+            <span class="settings-test-result" id="chatTestResult"></span>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">② 嵌入模型（RAG 检索用，不开 RAG 可不填）</div>
+          <label class="same-key-check"><input type="checkbox" id="sameKeyCheck"> 地址 / Key 同聊天模型（同一个账号）</label>
+          <div id="vectorFields">
+            <div class="settings-field">
+              <label>接口地址</label>
+              <input id="vecUrlInput" type="text" placeholder="https://api.siliconflow.cn/v1">
+            </div>
+            <div class="settings-field">
+              <label>API Key</label>
+              <input id="vecKeyInput" type="password" placeholder="sk-..." autocomplete="off">
+            </div>
+            <div class="settings-test-row">
+              <button class="settings-test-btn" id="vecTestBtn">测试连接</button>
+              <span class="settings-test-result" id="vecTestResult"></span>
+            </div>
+          </div>
+          <div class="settings-field">
+            <label>模型名</label>
+            <input id="embedModelInput" type="text" placeholder="BAAI/bge-m3">
+          </div>
+          <div class="settings-hint">RAG 知识库检索需要嵌入模型（bge-m3，免费）。只在开启 RAG 提问时使用；换服务商时把模型名改成对方的名字。</div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">③ 重排模型（可选——不单独配就沿用上面的嵌入配置）</div>
+          <label class="same-key-check"><input type="checkbox" id="sameRerankKeyCheck" checked> 地址 / Key 同嵌入模型</label>
+          <div id="rerankFields">
+            <div class="settings-field">
+              <label>接口地址</label>
+              <input id="rerankUrlInput" type="text" placeholder="https://api.siliconflow.cn/v1">
+            </div>
+            <div class="settings-field">
+              <label>API Key</label>
+              <input id="rerankKeyInput" type="password" placeholder="sk-..." autocomplete="off">
+            </div>
+            <div class="settings-test-row">
+              <button class="settings-test-btn" id="rerankTestBtn">测试连接</button>
+              <span class="settings-test-result" id="rerankTestResult"></span>
+            </div>
+          </div>
+          <div class="settings-field">
+            <label>模型名</label>
+            <input id="rerankModelInput" type="text" placeholder="BAAI/bge-reranker-v2-m3">
+          </div>
+          <div class="settings-hint">跨编码器重排（bge-reranker-v2-m3，免费）把召回池按相关性精排，是命中率关键一环。用别家（Cohere / Jina 等）把地址、Key、模型名一起改掉即可。</div>
+        </div>
+
+        <!-- 通用性改造③（2026-09-23）：检索档位（池深）——快/均衡/深 -->
+        <div class="settings-section">
+          <div class="settings-section-title">④ 检索档位（重排候选池深度——影响召回与成本）</div>
+          <label class="same-key-check" style="display:flex;align-items:center;gap:6px;margin:8px 0">
+            <input type="radio" name="searchTierRadio" id="tierFast" value="60">
+            <span><b>快</b>（池 60）——低延迟低成本，简单问题够用</span>
+          </label>
+          <label class="same-key-check" style="display:flex;align-items:center;gap:6px;margin:8px 0">
+            <input type="radio" name="searchTierRadio" id="tierBalanced" value="100" checked>
+            <span><b>均衡</b>（池 100，默认）——生产当前档位</span>
+          </label>
+          <label class="same-key-check" style="display:flex;align-items:center;gap:6px;margin:8px 0">
+            <input type="radio" name="searchTierRadio" id="tierDeep" value="150">
+            <span><b>深</b>（池 150）——难问题多捞 50 块，重排成本 +50%</span>
+          </label>
+          <div class="settings-hint">池越深召回越全但重排 API 调用越多（成本≈池深比例）。评测口径是均衡档（100）——改档位后评测数字不直接可比。</div>
+          <div class="settings-hint" id="tierCostHint" style="color:#6b7280">成本预估：快 ≈0.6× ｜ 均衡 ≈1×（基准）｜ 深 ≈1.5× —— 单次检索约 0.5-3 秒，深档多约 1 秒</div>
+        </div>
+
+        <!-- ⑩2 检索模式（2026-09-22）：两档开关——agentic（默认）模型自决补查 / pipeline 纯资料注入 -->
+        <div class="settings-section">
+          <div class="settings-section-title">⑤ 检索模式（RAG 问答方式）</div>
+          <label class="same-key-check" style="display:flex;align-items:center;gap:6px;margin:8px 0">
+            <input type="radio" name="ragModeRadio" id="ragModeAgentic" value="agentic" checked>
+            <span><b>Agentic 自主检索</b>（推荐）——预检索资料注入 + 模型可自主调 search_kb 补查、拆多跳问题</span>
+          </label>
+          <label class="same-key-check" style="display:flex;align-items:center;gap:6px;margin:8px 0">
+            <input type="radio" name="ragModeRadio" id="ragModePipeline" value="pipeline">
+            <span><b>流水线</b>（对照档）——只注入预检索资料，模型只依据资料回答，不下发检索工具</span>
+          </label>
+          <div class="settings-hint">Agentic 档多跳题更准（模型自己拆问补查）；流水线档更快更省 token（单次检索）。</div>
+        </div>
+
+        <!-- D-6.0a 双链切换开关（2026-09-25 对照期——开=SSE 服务端新链，关=旧前端链） -->
+        <div class="settings-section">
+          <div class="settings-section-title">⑥ 对话引擎（双链对照期）</div>
+          <label class="same-key-check" style="display:flex;align-items:center;gap:6px;margin:8px 0">
+            <input type="radio" name="engineRadio" id="engineSse" value="sse" checked>
+            <span><b>SSE 服务端引擎</b>（推荐·新）——检索/追问/投票全在服务端执行，前端只收流式结果</span>
+          </label>
+          <label class="same-key-check" style="display:flex;align-items:center;gap:6px;margin:8px 0">
+            <input type="radio" name="engineRadio" id="engineLegacy" value="legacy">
+            <span><b>前端引擎</b>（旧·对照档）——浏览器本地跑工具循环（删链前的基准对照）</span>
+          </label>
+          <div class="settings-hint">两链应答一致；发现差异报 trace_id 给开发者。D-6.0b 对照期通过后旧引擎将移除。</div>
+        </div>
+      </div>
+
+      <div class="settings-footer">
+        <button class="settings-cancel-btn" id="settingsCancelBtn">取消</button>
+        <button class="settings-save-btn" id="settingsSaveBtn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=20260925-2"></script>  <!-- 缓存打散：改前端必须改版本号（advisory 实锤：强刷不穿透） -->
+</body>
+</html>

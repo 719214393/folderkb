@@ -1,0 +1,59 @@
+# requirements.txt —— 阶段六⑪5 依赖冻结（2026-09-23）
+# 固定版本——跨机器/跨平台复现的第一道保险（演进方案⑪5）
+# 安装：pip install -r requirements.txt
+fastapi==0.141.1
+
+httpx==0.28.1
+
+jieba==0.42.1
+
+lxml==6.1.1
+
+lxml_html_clean==0.4.5
+
+markdown-it-py==4.2.0
+
+numpy==2.5.3
+
+# macOS 12 Intel 专属钉版（warning.md §7.1 实测通过）：这 4 个包在
+# 老系统上没有可用轮子/会被 pip 拉源码包编译（无 rustc/cmake 必炸），
+# 用环境标记把降级范围圈死在 darwin x86_64——Windows / Apple Silicon
+# / 新 macOS 侧保持原版本零影响（warning.md §9-5：两边策略需分开）
+# onnxruntime：1.24.0 起不再发 macOS x86_64 轮子；1.19.2 是最后一个
+# macosx_11_0_universal2。rapid-table 硬依赖 onnxruntime>1.17.0，满足
+onnxruntime==1.19.2; sys_platform == "darwin" and platform_machine == "x86_64"
+onnxruntime==1.30.0; sys_platform != "darwin" or platform_machine != "x86_64"
+
+openpyxl==3.1.5
+
+pdfplumber==0.11.10
+
+cryptography==48.0.1    # 新增钉版：49+ 只发 arm64 轮子（universal2 最后版）
+
+pydantic==2.13.5
+
+pydantic_core==2.46.5
+
+pypdf==6.18.1
+
+# pypdfium2：5.12+ 轮子标签 macosx_13_0_x86_64 且 py3-none（换 Python
+# 版本救不了）；5.11.0 是最后一个支持 macOS 12 的版本
+pypdfium2==5.11.0; sys_platform == "darwin" and platform_machine == "x86_64"
+pypdfium2==5.13.0; sys_platform != "darwin" or platform_machine != "x86_64"
+
+python-docx==1.2.0
+
+pywebview==6.2.1
+
+rapidocr==3.9.2
+rapid-table==3.0.2
+
+# opencv_python：4.11+ 要求 macOS 13/14；4.10.0.84 是最后一个
+# macosx_12_0_x86_64。cryptography 48.0.1 与 opencv 4.10.0.84 在
+# Windows/新 macOS 上也有轮子，全局钉即可（无需标记）
+opencv_python==4.10.0.84
+
+uvicorn==0.52.4
+
+Pillow==12.3.0
+

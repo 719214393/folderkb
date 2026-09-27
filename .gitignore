@@ -1,0 +1,143 @@
+# ===== 运行时数据 =====
+logs/
+*.log
+rag_index.db
+
+# ===== 语料派生词典（随各库自动重建，绝不入库）=====
+header_dict.json
+query_dict.json
+
+# ===== 评测/守夜派生件（开源版不带）=====
+eval_*.jsonl
+eval_*.json
+agentic_*.jsonl
+judge_*
+*_hits_*.jsonl
+*_detail_*.jsonl
+.重判.jsonl
+错题归因*.md
+重判终表*.md
+
+# ===== 守夜/评测私货脚本（开源版不带）=====
+watch_*.py
+night_watch_*.py
+judge_*.py
+heartbeat*.py
+analyze_fails.py
+auto_rejudge*.py
+human_rejudge*.py
+_tmp_*.py
+_tmp_*.js
+fix_*.py
+enrich_expect_keywords.py
+reextract_tables.py
+step4_rescan.py
+reset_*.py
+intake_precheck.py
+smoke_*.py
+run_*.py
+chk_*.py
+
+# ===== 个人计划/手册（含内网信息与工作过程，不入库）=====
+todo.md
+*计划*.md
+*手册*.md
+*对照*.md
+*实测*.md
+*迁移*.md
+D5*.md
+D5*.json
+
+# ===== 虚拟环境（uv venv / python -m venv 产物，含全部依赖，不入库）=====
+.venv/
+venv/
+
+# ===== Python 缓存 =====
+__pycache__/
+*.pyc
+*.pyo
+
+# ===== 备份/临时 =====
+*.bak
+*.bak*
+_mini_eval.json
+old_prompt_test.txt
+out_questions.txt
+crash.log*
+judge.pid
+judge_hb_out.log
+judge_out.log
+agent://*
+
+# ===== 系统 =====
+.DS_Store
+Thumbs.db
+
+# ===== 评测/出题工具件（开源版不带，2026-09-26 补漏）=====
+dead_zone_runner.py
+rerank_off_runner.py
+retry_net_r2.py
+analyze_fails.py
+heartbeat_e2e.py
+heartbeat10.py
+gen_questions.py
+gen_parallel.py
+gen_1000.py
+gen_bc100.py
+gen_1000*.py
+quick_gen.py
+dedup_filter.py
+criterion_health_check.py
+verify_sql.py
+progress_report.py
+validate.py
+fail_sentry.py
+gen_*.py
+
+# ===== 评测脚本全家桶（.py，2026-09-26 二次补漏）=====
+eval*.py
+agentic_eval*.py
+agentic_*.jsonl
+night_*.py
+retest_*.py
+rejudge_*.py
+offline_rejudge.py
+*rejudge*.py
+_auto_verify.py
+_chk.py
+_progress_guard.py
+_reset_watch.py
+*.jsonl
+eval_live_progress.txt
+
+# ===== 演进/报告/手册类文档（工作过程件，不开源；仅限项目根目录）=====
+# 注意：最后两条必须带前导 /，否则会连 docs/ 下的正式文档一起排除
+Agent+RAG演进方案.md
+RAG检索业界方案全览.md
+全量错题归因报告*.md
+守夜评测报告*.md
+日志系列实施清单*.md
+/检索全链路说明*.md
+/检索流程图*.md
+沟通铁律.md
+*快照*.json
+
+# ===== tests/ 评测私货目录（recheck / smoke 系脚本不入库）=====
+tests/*
+recheck_*.py
+smoke_*.py
+
+# ===== 评测临时/报告 json（2026-09-26 最后收口）=====
+_tmp_*.json
+e2e_rejudge*.json
+mmr_final_table.json
+neg23_*.json
+scan_result.json
+交叉归因*.json
+入库预检报告.json
+判据健康报告.json
+整句判据核库报告.json
+核库报告.json
+
+# eval.json 语料派生（1546 题含真实业务文档名/人名）——README「数据与隐私」口径一致
+eval.json
